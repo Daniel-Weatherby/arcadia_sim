@@ -1,17 +1,16 @@
 from models.agent import Agent
 from environment import Environment, Service
 
-# Create environment and services
+# Setup
 env = Environment()
-env.add_service(Service("Clinic A", capacity=2, service_type="health"))
+env.add_service(Service("Clinic A", 2, "health"))
+env.add_service(Service("School A", 2, "education"))
 
-# Create agents
-agents = [Agent(f"Agent {i}", age=25 + i) for i in range(3)]
+agents = [Agent(f"Agent {i}", age=20 + i) for i in range(4)]
 
-# Simulate one day
+# Simulate a day
 for agent in agents:
     agent.act(env)
 
-# Reset for the next day
+# Reset services for the next day
 env.reset_services()
-
