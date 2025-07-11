@@ -1,17 +1,17 @@
 from models.agent import Agent
+from environment import Environment, Service
 
-def run_simulation():
-    agents = [
-        Agent("Kylie", 12),
-        Agent("Mark", 35),
-        Agent("Aunty Joan", 55),
-    ]
+# Create environment and services
+env = Environment()
+env.add_service(Service("Clinic A", capacity=2, service_type="health"))
 
-    for day in range(1, 6):
-        print(f"\n📅 Day {day}")
-        for agent in agents:
-            print(f"{agent.name} (happiness: {agent.happiness:.2f})")
-            agent.live_one_day()
+# Create agents
+agents = [Agent(f"Agent {i}", age=25 + i) for i in range(3)]
 
-if __name__ == "__main__":
-    run_simulation()
+# Simulate one day
+for agent in agents:
+    agent.act(env)
+
+# Reset for the next day
+env.reset_services()
+

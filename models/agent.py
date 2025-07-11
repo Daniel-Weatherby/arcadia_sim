@@ -1,4 +1,5 @@
 import random
+from environment import Environment, Service
 
 class Agent:
     def __init__(self, name, age):
@@ -23,17 +24,21 @@ class Agent:
             else:
                 self.needs[need] = 0  # currently satisfied
 
-    def act(self):
-        """Agent takes action based on most urgent need"""
-        for level in ["physical", "safety", "belonging", "purpose"]:
-            if self.needs[level] == 1:
-                print(f"  {self.name} is trying to satisfy {level} needs.")
-                self.energy -= 10
-                self.happiness += 0.05  # feels progress
-                self.needs[level] = 0   # satisfied for now
-                break  # handle one need per day
+    def act(self, environment):
+        """Let the agent try to fulfill one of their needs via the environment.
 
-        self.happiness = max(0, min(1, self.happiness))
+        Args:
+            environment (Environment): The city environment holding services.
+        """
+        # For now, just hard-code a single need (e.g. 'health')
+        need = "health"
+        services = environment.get_services_by_type(need)
+
+        for service in services:
+            if service.use(self.name):
+                print(f"{self.name} used {service.name} for {need}.")
+                return  # success — agent is done
+        print(f"{self.name} could not find an available {need} service.")
 
     def live_one_day(self):
         self.evaluate_needs()
