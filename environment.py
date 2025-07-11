@@ -41,13 +41,57 @@ class Service:
         self.current_users.clear()
 
 
+class Environment:
+    """Represents the city environment containing community services.
+
+    Attributes:
+        services (dict): Maps service name (str) to Service instances.
+    """
+
+    def __init__(self):
+        """Initialize an empty environment with no services."""
+        self.services = {}
+    
+    def add_service(self, service):
+        """Add a Service object to the environment.
+
+        Args:
+            service (Service): A Service instance to add.
+        """
+        self.services[service.name] = service
+
+    def get_services_by_type(self, service_type):
+        """Return a list of services matching the given type.
+
+        Args:
+            service_type (str): The type of service (e.g. 'health').
+
+        Returns:
+            list: List of Service objects matching the type.
+        """
+        return [s for s in self.services.values() if s.service_type == service_type]
+
+    def reset_services(self):
+        """Call reset() on all services to clear their current users."""
+        for service in self.services.values():
+            service.reset()
+
+
 
 if __name__ == "__main__":
-    clinic = Service("Clinic A", capacity=2, service_type="health")
+    # Existing tests for Service...
 
-    clinic.use("Agent1")
-    clinic.use("Agent2")
-    print(clinic.current_users)  # ['Agent1', 'Agent2']
+    # Environment tests
+    env = Environment()
+    env.add_service(Service("Clinic A", 2, "health"))
+    env.add_service(Service("School A", 10, "education"))
 
-    clinic.reset()
-    print(clinic.current_users)  # []
+    health_services = env.get_services_by_type("health")
+    print(f"Health services: {[s.name for s in health_services]}")  # ['Clinic A']
+
+    env.services["Clinic A"].use("Agent1")
+    env.services["Clinic A"].use("Agent2")
+    print(env.services["Clinic A"].is_available())  # False
+
+    env.reset_services()
+    print(env.services["Clinic A"].current_users)  # []
