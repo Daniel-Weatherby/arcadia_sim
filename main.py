@@ -1,16 +1,25 @@
 from models.agent import Agent
 from environment import Environment, Service
 
-# Setup
+# Create the environment and add services
 env = Environment()
-env.add_service(Service("Clinic A", 2, "health"))
-env.add_service(Service("School A", 2, "education"))
+env.add_service(Service("Wellness Clinic", capacity=2, service_type="physical"))
+env.add_service(Service("Security Hub", capacity=1, service_type="safety"))
+env.add_service(Service("Community Center", capacity=2, service_type="belonging"))
+env.add_service(Service("Job Centre", capacity=2, service_type="purpose"))
 
-agents = [Agent(f"Agent {i}", age=20 + i) for i in range(4)]
+# Create agents
+agents = [Agent(f"Agent {i}", age=20 + i) for i in range(5)]
 
-# Simulate a day
+# Simulate one day
+print("\n🌅 A new day in Arcadia:")
 for agent in agents:
-    agent.act(env)
+    agent.live_one_day(env)
 
-# Reset services for the next day
+# Print agent status
+print("\n📊 Agent Summary:")
+for agent in agents:
+    print(f"{agent.name}: happiness={agent.happiness:.2f}, energy={agent.energy}, needs={agent.needs}")
+
+# Reset services
 env.reset_services()
