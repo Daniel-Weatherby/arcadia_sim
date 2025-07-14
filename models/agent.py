@@ -1,55 +1,60 @@
-import random
-
 class Agent:
-    """Represents a person in the simulation with needs and decision-making."""
-
     def __init__(self, name, age):
-        """
-        Initialize the agent with a name, age, and base needs.
-
-        Args:
-            name (str): The name of the agent.
-            age (int): Age of the agent.
-        """
         self.name = name
         self.age = age
         self.energy = 100
-        self.happiness = random.uniform(0.4, 0.6)
-
-        # Needs: values from 0.0 (satisfied) to 1.0 (critical)
+        self.happiness = 1.0
+        self.money = 50  # Starting money
         self.needs = {
-            "food": random.uniform(0.2, 0.6),
-            "health": random.uniform(0.2, 0.6),
-            "education": random.uniform(0.2, 0.6)
+            "food": 0.0,
+            "health": 0.0,
+            "education": 0.0,
+            "work": 0.0,
         }
+        self.alive = True
+        self.work_earnings_per_tick = 10  # Earnings for using work service
+        self.work_cooldown = 0  # ticks before can work again
+
+    def is_alive(self):
+        return self.alive
+
+    def update_energy_and_check_death(self):
+        if self.energy <= 0:
+            self.alive = False
 
     def evaluate_needs(self):
-        """Adjust needs over time — increase or decay them based on state."""
-        for need, level in self.needs.items():
-            # If satisfied (low), decay a bit
-            if level < 0.5:
-                decay = random.uniform(0.01, 0.05)
-                self.needs[need] = max(0.0, level - decay)
-            else:
-                # If unmet (high), increase further
-                increase = random.uniform(0.05, 0.1)
-                self.needs[need] = min(1.0, level + increase)
+        # Needs increase over time
+        self.needs["food"] += 0.5
+        self.needs["health"] += 0.2
+        self.needs["education"] += 0.3
+        self.needs["work"] += 0.4
+
+        # Reduce work cooldown if set
+        if self.work_cooldown > 0:
+            self.work_cooldown -= 1
 
     def decide_need(self):
-        """Choose the most urgent need."""
-        most_urgent = max(self.needs.items(), key=lambda item: item[1])
-        print(f"{self.name} choosing {most_urgent[0]} (urgency: {most_urgent[1]:.2f})")
-        return most_urgent[0]
+        if self.energy <= 25:
+            return "food"  # Prioritize food when energy is low
+        return max(self.needs, key=self.needs.get)
 
-    def fulfill_need(self, need):
-        """Lower the urgency of a need after using a service.
+    def fulfill_need(self, need_type):
+        if need_type in self.needs:
+            self.needs[need_type] = 0.0
 
-        Args:
-            need (str): The need being fulfilled.
-        """
-        if need in self.needs:
-            self.needs[need] = max(0.0, self.needs[need] - 0.8)
+    def earn_money_from_work(self):
+        """Called when agent uses work service successfully."""
+        if self.work_cooldown == 0:
+            self.money += self.work_earnings_per_tick
+            self.work_cooldown = 5  # example cooldown to prevent continuous earning
 
-    def get_need_level(self, need):
-        """Return the urgency level of a given need."""
-        return self.needs.get(need, 0.0)
+    def can_afford(self, cost):
+        """Check if agent has enough money to pay cost."""
+        return self.money >= cost
+
+    def pay(self, cost):
+        """Deduct cost from money if affordable, else return False."""
+        if self.can_afford(cost):
+            self.money -= cost
+            return True
+        return False

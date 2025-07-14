@@ -1,7 +1,9 @@
 class Service:
     """Represents a service in the simulation (e.g. school, clinic)."""
 
-    def __init__(self, name, capacity, service_type, x=0, y=0, energy_reward=5, happiness_reward=0.1, usage_duration=3):
+    def __init__(self, name, capacity, service_type, x=0, y=0,
+                 energy_reward=5, happiness_reward=0.1,
+                 usage_duration=3, cost=0):
         self.name = name
         self.capacity = capacity
         self.service_type = service_type
@@ -9,42 +11,41 @@ class Service:
         self.y = y
         self.energy_reward = energy_reward
         self.happiness_reward = happiness_reward
-        self.usage_duration = usage_duration  # new attribute
+        self.usage_duration = usage_duration
+        self.cost = cost  # New cost attribute
         self.current_users = {}
-        self.users_time = {}  # track time each user has been using the service
+        self.users_time = {}
 
     def release(self, agent_name):
-        """Remove agent from current users and usage tracking.
-
-        Args:
-            agent_name (str): The name of the agent leaving the service.
-        """
+        """Remove agent from current users and usage tracking."""
         if agent_name in self.current_users:
-            self.current_users.remove(agent_name)
+            del self.current_users[agent_name]
         if agent_name in self.users_time:
-            del self.users_time[agent_name]
-
-    def tick(self):
-        """Reduce usage timers and free agents who completed their service."""
-        to_remove = []
-        for agent_name in self.users_time:
-            self.users_time[agent_name] -= 1
-            if self.users_time[agent_name] <= 0:
-                to_remove.append(agent_name)
-        for agent_name in to_remove:
-            self.current_users.remove(agent_name)
             del self.users_time[agent_name]
 
     def is_available(self):
         """Return True if service has capacity."""
         return len(self.current_users) < self.capacity
 
-    def use(self, agent_name):
-        """Try to let an agent use the service if there's room."""
+    def use(self, agent):
+        """
+        Try to let an agent use the service if there's room and agent can pay.
+        
+        Args:
+            agent (Agent): The agent object trying to use the service.
+
+        Returns:
+            bool: True if agent started using service, False if not.
+        """
         if self.is_available():
-            self.current_users[agent_name] = self.usage_duration
-            self.users_time[agent_name] = self.usage_duration  # track usage time
-            return True
+            if agent.money >= self.cost:
+                agent.money -= self.cost
+                self.current_users[agent.name] = self.usage_duration
+                self.users_time[agent.name] = self.usage_duration
+                return True
+            else:
+                # Agent cannot afford the service
+                return False
         return False
 
     def tick(self):
@@ -52,12 +53,15 @@ class Service:
         finished = [a for a, t in self.current_users.items() if t <= 1]
         for agent in finished:
             del self.current_users[agent]
+            del self.users_time[agent]
         for agent in self.current_users:
             self.current_users[agent] -= 1
+            self.users_time[agent] -= 1
 
     def reset(self):
         """Clear users — used during full resets."""
         self.current_users.clear()
+        self.users_time.clear()
 
 
 class Environment:

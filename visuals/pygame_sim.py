@@ -2,6 +2,7 @@ import pygame
 import random
 from environment import Environment, Service
 from models.agent import Agent
+from utils.logger import AgentDataLogger
 
 # --- Constants ---
 SCREEN_WIDTH, SCREEN_HEIGHT = 600, 600
@@ -28,6 +29,8 @@ class AgentSprite(pygame.sprite.Sprite):
         self.state = "idle"  # idle, moving, at_service, returning
         self.target = None
         self.agent_need = None
+        self.home_x = random.randint(0, GRID_SIZE - 1)
+        self.home_y = random.randint(0, GRID_SIZE - 1)
 
         self.image = pygame.Surface((CELL_SIZE - 4, CELL_SIZE - 4))
         self.image.fill((random.randint(50, 255), random.randint(50, 255), random.randint(50, 255)))
@@ -36,17 +39,6 @@ class AgentSprite(pygame.sprite.Sprite):
 
     def update_rect(self):
         self.rect.topleft = (self.x * CELL_SIZE + 2, self.y * CELL_SIZE + 2)
-
-    def tick(self):
-        """Call every simulation tick to reduce usage time per agent and free spots."""
-        to_remove = []
-        for agent_name in self.users_time:
-            self.users_time[agent_name] -= 1
-            if self.users_time[agent_name] <= 0:
-                to_remove.append(agent_name)
-        for agent_name in to_remove:
-            self.current_users.remove(agent_name)
-            del self.users_time[agent_name]
 
     def move_towards(self, target_x, target_y):
         dx = target_x - self.x
@@ -98,16 +90,19 @@ class AgentSprite(pygame.sprite.Sprite):
         if self.state == "moving":
             # Move toward service
             if (self.x, self.y) == (self.target.x, self.target.y):
-                # Try to use the service
-                if self.target.use(self.agent.name):
+                # Try to use the service, passing full agent object
+                if self.target.use(self.agent):
                     print(f"{self.agent.name} entered {self.target.name} for {self.agent_need}")
                     self.state = "at_service"
                     # Apply rewards
                     self.agent.happiness = min(1.0, self.agent.happiness + self.target.happiness_reward)
                     self.agent.energy = min(100, self.agent.energy + self.target.energy_reward)
                     self.agent.fulfill_need(self.agent_need)
+                    # Earn money if work service
+                    if self.agent_need == "work":
+                        self.agent.earn_money_from_work()
                 else:
-                    print(f"{self.agent.name} could not access {self.target.name}")
+                    print(f"{self.agent.name} could not access {self.target.name} (possibly insufficient funds)")
                     self.agent.energy = max(0, self.agent.energy - 5)
                     self.agent.happiness = max(0.0, self.agent.happiness - 0.05)
                     self.state = "idle"
@@ -138,6 +133,7 @@ class AgentSprite(pygame.sprite.Sprite):
             else:
                 self.move_towards(self.home_x, self.home_y)
 
+
 # --- Main simulation function ---
 def main():
     pygame.init()
@@ -145,14 +141,17 @@ def main():
     pygame.display.set_caption("ArcadiaSim: Pygame Visualization")
     clock = pygame.time.Clock()
 
-    # Create environment and services
+    # Create environment and services (add cost to services here)
     env = Environment()
-    env.add_service(Service("Clinic A", 2, "health", x=2, y=2, energy_reward=2, happiness_reward=0.2))
-    env.add_service(Service("School A", 2, "education", x=6, y=2, energy_reward=1, happiness_reward=0.15))
-    env.add_service(Service("Takeaway", 3, "food", x=4, y=6, energy_reward=10, happiness_reward=0.2))
+    env.add_service(Service("Clinic A", 2, "health", x=2, y=2, energy_reward=2, happiness_reward=0.2, cost=5))
+    env.add_service(Service("School A", 2, "education", x=6, y=2, energy_reward=1, happiness_reward=0.15, cost=3))
+    env.add_service(Service("Takeaway", 3, "food", x=4, y=6, energy_reward=10, happiness_reward=0.2, cost=4))
+    env.add_service(Service("Workplace", 3, "work", x=8, y=8, energy_reward=-5, happiness_reward=0, cost=0))  # Work pays agents, cost=0
 
     # Create agents
     agents = [Agent(f"Agent {i}", random.randint(18, 60)) for i in range(5)]
+    day_count = 1
+    logger = AgentDataLogger("agent_log.csv")
     agent_sprites = pygame.sprite.Group()
 
     for agent in agents:
@@ -181,33 +180,42 @@ def main():
 
         # Tick environment to update services usage timers
         env.tick()
-        
+
         # Update and draw agents
         for sprite in agent_sprites:
             sprite.update(env)
             screen.blit(sprite.image, sprite.rect)
 
-        # Draw need bars above agents
-        bar_width = CELL_SIZE - 4
-        bar_height = 5
-        bar_x = sprite.rect.left
-        bar_y = sprite.rect.top - bar_height - 2
+            # Draw need bars above agents
+            bar_width = CELL_SIZE - 4
+            bar_height = 5
+            bar_x = sprite.rect.left
+            bar_y = sprite.rect.top - bar_height - 2
 
-        for idx, (need, level) in enumerate(sprite.agent.needs.items()):
-            fill_width = int(bar_width * level)
-            pygame.draw.rect(screen, NEED_COLORS.get(need, GRAY),
-                                (bar_x, bar_y + idx * (bar_height + 2), fill_width, bar_height))
+            for idx, (need, level) in enumerate(sprite.agent.needs.items()):
+                fill_width = int(bar_width * level)
+                pygame.draw.rect(screen, NEED_COLORS.get(need, GRAY),
+                                 (bar_x, bar_y + idx * (bar_height + 2), fill_width, bar_height))
+
+            # Draw money above needs bars
+            font = pygame.font.SysFont(None, 14)
+            money_text = font.render(f"$ {sprite.agent.money:.0f}", True, BLACK)
+            screen.blit(money_text, (bar_x, bar_y - 15))
 
         print("\n--- Agent Status Summary ---")
         for sprite in agent_sprites:
             agent = sprite.agent
             needs_status = ", ".join(f"{k}: {v:.2f}" for k, v in agent.needs.items())
-            print(f"{agent.name} | Energy: {agent.energy:.1f} | Happiness: {agent.happiness:.2f} | Needs: [{needs_status}]")
-        
+            print(f"{agent.name} | Energy: {agent.energy:.1f} | Happiness: {agent.happiness:.2f} | Money: ${agent.money:.0f} | Needs: [{needs_status}]")
+
+        day_count += 1
+        logger.log(day_count, [sprite.agent for sprite in agent_sprites])
+
         pygame.display.flip()
         clock.tick(5)
 
     pygame.quit()
+
 
 if __name__ == "__main__":
     main()
